@@ -77,6 +77,6 @@
    Now that we have trained our score model to estimate the underlying score function $s_{\theta} \approx \nabla_{x} log p(x)$ we want a method for generating new data points from the given vector field of score functions.\\
    Langevin dynamics is an iterative procedure that allows to draw samples from our score model. The procedure is as follows:
    \begin{itemize}
-   	\item Initialize the sample from an arbitrary prior distribution: $x^{o} \sim \pi(x)$, then repeat this for $z^{t} \leftarrow 1,2,...,T$ $z$
+   	\item Initialize the sample from an arbitrary prior distribution: $x^{o} \sim \pi(x)$, then repeat this for $z^{t} \leftarrow 1,2,...,T\ z^{t} \sim \mathcal{N}(0,I)$
    \end{itemize}
 \end{document}
