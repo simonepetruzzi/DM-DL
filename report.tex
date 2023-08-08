@@ -74,5 +74,9 @@
 	\end{equation}
 	in this approach we must take care of the trade-off between the quantity of the noise injected. If you want to work well in estimating score functions of noise-free data densities, you need a very small $\sigma$. However when $\sigma$ is too small, the variance of the objective function becomes bigger and eventually explodes. 
    \section{Langevin dynamics}
-   Now that we have trained our score model to estimate the underlying score function $s_{\theta} \approx \nabla_{x} log p(x)$ we want a method for generating new data points from the given vector field of score functions.
+   Now that we have trained our score model to estimate the underlying score function $s_{\theta} \approx \nabla_{x} log p(x)$ we want a method for generating new data points from the given vector field of score functions.\\
+   Langevin dynamics is an iterative procedure that allows to draw samples from our score model. The procedure is as follows:
+   \begin{itemize}
+   	\item Initialize the sample from an arbitrary prior distribution: $x^{o} \sim \pi(x)$, then repeat this for $z^{t} \leftarrow 1,2,...,T$ $z$
+   \end{itemize}
 \end{document}
