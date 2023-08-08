@@ -18,7 +18,7 @@
 	\end{equation}
 	In case of deep neural networks the computation of this integral becomes intractable (NP-complete problem). In order to tackle with the intractability of the normalizing constant, this proposal aims to work with \textbf{score functions}.
 	\newpage
-	\section{Score-based generative modelling}
+   \section{Score-based generative modeling}
 	The score funcion is a vector field that gives the direction where the density fucntion grows most quickly. We define the score of a probability density $p(x)$ to be:
 	\begin{equation}
 	p(x) = \nabla_{x}\ log\ p(x)
@@ -73,4 +73,6 @@
 	\frac{1}{2} \mathbb{E}_{p_{data}(x)} \mathbb{E}_{q_{\sigma}(\tilde{x}|x)}[||s_{\theta}(\tilde{x}) - \nabla_{\tilde{x}}logq_{\sigma}(\tilde{x}|x)||_{2}^{2}]
 	\end{equation}
 	in this approach we must take care of the trade-off between the quantity of the noise injected. If you want to work well in estimating score functions of noise-free data densities, you need a very small $\sigma$. However when $\sigma$ is too small, the variance of the objective function becomes bigger and eventually explodes. 
+   \section{Langevin dynamics}
+   Now that we have trained our score model to estimate the underlying score function $s_{\theta} \approx \nabla_{x} log p(x)$ we want a method for generating new data points from the given vector field of score functions.
 \end{document}
