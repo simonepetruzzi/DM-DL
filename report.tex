@@ -73,10 +73,28 @@
 	\frac{1}{2} \mathbb{E}_{p_{data}(x)} \mathbb{E}_{q_{\sigma}(\tilde{x}|x)}[||s_{\theta}(\tilde{x}) - \nabla_{\tilde{x}}logq_{\sigma}(\tilde{x}|x)||_{2}^{2}]
 	\end{equation}
 	in this approach we must take care of the trade-off between the quantity of the noise injected. If you want to work well in estimating score functions of noise-free data densities, you need a very small $\sigma$. However when $\sigma$ is too small, the variance of the objective function becomes bigger and eventually explodes. 
-   \section{Langevin dynamics}
+   \subsection{Langevin dynamics}
    Now that we have trained our score model to estimate the underlying score function $s_{\theta} \approx \nabla_{x} log p(x)$ we want a method for generating new data points from the given vector field of score functions.\\
    Langevin dynamics is an iterative procedure that allows to draw samples from our score model. The procedure is as follows:
    \begin{itemize}
    	\item Initialize the sample from an arbitrary prior distribution: $x^{o} \sim \pi(x)$, then repeat this for $z^{t} \leftarrow 1,2,...,T\ z^{t} \sim \mathcal{N}(0,I)$
+	\item In each sampling step, first generate a random Gaussian vector from the standard Gaussian distribution, then modify x according to the following recurrence:
+	\begin{equation}
+	x_{t} \leftarrow x^{t-1} + \frac{\epsilon}{2} \nabla_{x} log\ p(x^{t-1})+\sqrt{\epsilon}\ z^{t}
+	\end{equation}
    \end{itemize}
+   We basically update the previous sample using our score function, plus a scaled version of the Gaussian noise vector. If $\epsilon \rightarrow 0$ and $T \rightarrow \infty$, we are guaranteed to have $x^{t} \sim p(x)$.\\
+   It becomes very natural to replace the score function in Langevin dynamics with our score model ($s_{\theta}(x) \approx \nabla_{x}log\ p(x)$), then we can generate new data samples, defining a new generative model.
+   \newline
+   \subsection{Naive score-based generative modeling and its pitfalls}
+   This procedure has drawbacks: we have at first problem in estimating correctly the score function in low data density regions. In those regions we usually don't have enough samples to estimate the score function accurately. Remember that score matching minimizes the expected squared error of the score estimates, $i.e., \frac{1}{2}\mathbb{E}_{p_{data}(x)}[||\nabla_{x}\ log\ p_{data}(x) - s_{\theta}(x) ||_{2}^{2}]$. In practice the expectation is always estimated using i.i.d samples $\{ x_{i}\}_{i=0}^{N} \sim p_{data}(x)$ and when there is a lack of them, the estimation is inaccurate.\\
+   \newline
+    Also, Langevin dynamics,  when two modes of the data distribution are separated by low density regions, will be not able to recover the relative weights of these two modes in reasonable time. Langevin dynamics can produce correct samples in theory, but it may require a very small step size and  a very large number of step to mix, increasing drastically the computation time.
+    \newpage
+    \section{Score-based generative modeling with multiple noise perturbations}
+    In the previous section we talked about score-based generative modeling and it's problems. The main problem of that approach is bad estimation of the score function in low data density regions. We can address this challenge by injecting Gaussian noise to perturb our data data points and then doing the exact same procedure on the perturbed data. After having added enough Gaussian noise we provide useful directional information for Langevin dynamics, also score functions of noisy data densities are much easier to be estimated accurately. \\
+    \newline
+    However by simply injecting Gaussian noise we don't solve the problem, because after perturbing data points, the noisy data densities distances, are no longer good approximation for the original data density. How to choose the right level of noise ? To solve this, we can use multiple noise levels simultaneously and consider a noise conditional score model. This model takes noise level $\sigma$ as additional input dimension to the model and the output corresponds to the score function of the perturbed data density by $\sigma$.  We perturb the data distribution $p(x)$ with a Gaussian noise $\mathcal{N}(0,\sigma_{i}^{2}I), i=1,2,...,L$, obtaining the noise-perturbed distribution:
+   
+   
 \end{document}
