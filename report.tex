@@ -4,6 +4,9 @@
 \date{August 2023}
 \usepackage[margin=1.5in]{geometry} % Adjust the values as per your requirements
 \usepackage{amssymb}
+\usepackage{graphicx}
+\graphicspath{ {./images/} }
+
 \begin{document}
    \maketitle
    \section{Introduction}
@@ -118,5 +121,39 @@
      When $\sigma_{1}$ is sufficiently large, the low density regions of $q_{\sigma_{1}}(x)$ become small and the modes become less isolated. Also as discussed previously the score estimation is more accurate. We can argue that Langevin dynamics produces good samples for $q_{\sigma_{1}}(x)$, and also that those samples are likely to come from high density regions of $q_{\sigma_{1}}(x)$, meaning that this is valid also for $q_{\sigma_{2}}(x)$ (given that $q_{\sigma_{1}}(x)$ and $q_{\sigma_{2}}(x)$ slightly differ each other), and so on. Thus as score estimation and Langevin dynamics perform better in high density regions, samples from $q_{\sigma_{i-1}}(x)$ provide good initial point for $q_{\sigma_{i}}(x)$. Finally we obtain good samples of good quality from $q_{\sigma_{L}}(x)$ that is our last step.
      \newpage
      \section{Score-based generative modeling with stochastic differential equations}
-     
+     As already discussed, adding multiple noise scale is critical for the success of score-based generative models. In this section the aim is to generalize the previous framework (that is using a finite number of noise levels), to use an infinite number of noise levels. By generalizing the number of noise scales to infinity, we obtain not only high quality samples, but also, among others, exact log-likelihood computation, and controllable generation. Specifically we consider a continuum of distribution that evolve over time according to a diffusion process that progressively diffuses a data point itno random noise, and is given by a SDE (Stochastic Differential Equation) that does not depend on the data and has no trainable parameters. After the training procedure, by reversing the previous process, we can mold random noise into data for sample generation. This reverse process relys on a reverse-time SDE, which can be derived from the forward SDE given the score of the marginal probbility densities as function of time. Therefore we can approximate the reverse-time SDE with a time-dependent neural network which estimates the scores, and then produce samples by simply using numerical SDE solvers.\\
+      \begin{figure}[h]
+	  	\includegraphics[width=11cm]{SDEmodel}
+	  	\centering
+	  \end{figure}
+	\subsection{Perturbing data with SDEs}
+When the number of noise scales approaches infinity, we essentially perturb the data distribution with continuously growing levels of noise. The perturbation procedure is a continuous time stochastic process. Our goal is to construct a diffusion process that is solution of a stochastic differential equation. This diffusion process $\{ x(t) \}_{t=0}^{T}$ can be modeled as the solution of the following SDE:
+	\begin{equation}
+	 dx= f(x,t)dt + g(t)dw
+	\end{equation}
+	where $f(.,t): \mathbb{R}^{d} \rightarrow \mathbb{R}^{d}$ is a vector-valued function called drift coefficient of $x(t)$ (controls deterministic properties of the stochastic process), $g(.): \mathbb{R} \rightarrow \mathbb{R}$ is a scalar function known as the diffusion coefficient of $x(t)$, and w is the standard Wiener process. The $dw_{t}$ can be seen as the infinitesimal Gaussian noise the each time is injected.\\
+	The solution of a stochastic differential is continuous collection of random variables that trace stochastic trajectories as the time grows. Let $p_{t}(x)$ denote the marginal probability density function of $x(t)$ with $t \in [0,T] $, clearly $p_{0}(x)$ is the data distribution with no perturbation. After perturbing the data distribution with enough noise , $p_{T}(x)$ becomes close to a tractable noise distribution $\pi (x)$ that is called prior distribution. \\
+	\newline
+	A specific differential equation that we can use for this purpose (choice of SDE isn't unique) could be:
+	\begin{equation}
+	dx=e^t\ dw
+	\end{equation}
+	it perturbs data with a Gaussian noise of mean zero and exponentially growing variance
+	\subsection{Reversing the SDE for sample generation}
+For a finite number of noise scales, we can generate samples by reversing the perturbation process using annealed Langevin dynamics, i.e, sequentially sampling from each noise perturbed distribution using Langevin dynamics. For infinite noise scales we can do the same as the Langevin dynamics by reversing the forward SDE. Thus by starting form samples of $x(T) \sim p_{T}$ and reversing the process, we can obtain samples $x(0) \sim p_{0}$. It was proved that the reverse of a diffusion process is also a diffusion process, and any SDE has corresponding reverse SDE. The reverse SDE in our case is:
+	\begin{equation}
+	dx = [f(x,t)-g(t)^2 \nabla_{x}logp_{t}(x)]dt+g(t)d \bar{w}
+	\end{equation}
+	where $\bar{w}$ is a standard Wiener process when the time flows backwards from T to 0, and $dt$ is the infinitesimal reverse (negative) time step. In order to estimate the reverse SDE we must compute $\nabla_{x}logp_{t}(x)$, which is exactly the score function of $p_t(x)$
+     \subsection{Estimating the reverse SDE with score-based models and score matching}
+     In order to solve the reverse SDE is required the terminal distribution $p_{T}(x)$ and the score function $\nabla_{x}logp_{t}(x)$. To estimate the score function we can train a time-dependent score-based model $s_{\theta}(x,t)$. The objective function is a continuous weighted combination of Fisher divergence:
+     \begin{equation}
+	 \theta^*= \mathop{argmin}_{\theta} \mathbb{E}_{t} \{ \lambda(t) \mathbb{E}_{x(0)} \mathbb{E}_{x(t)|x(0)} [||s_{\theta}(x(t),t) - \nabla_{x}logp_{0t}(x(t)|x(0))||_{2}^{2}] \} 
+	 \end{equation}      
+	 Here $\lambda$ : $[0,T] \rightarrow \mathbb{R}_{>0}$ is a positive weighting function and $x(0) \sim p_{0}(x)$ and $x(t) \sim p_{0t}(x(t)|x(0))$. As before, this combination of Fisher divergence can be optimized efficiently with score metching methods and once the model is trained we can plug it into the reverse SDE.\\
+	 When $\lambda(t) = g^2(t)$, we have an important connection between the combination of Fisher divergence and the Kullback-Leibler divergence form $p_{0}$ to $p_{\theta}$ under some regularity conditions. Since the KL divergence is directly related to maximal likelihood training, by minimizing the score function with this particular likelihood of weighting functions, we  are implicitly maximizing likelihoods.
+	 \begin{equation}
+	 KL(p_{0}(x) || p_{\theta} \leq \frac{1}{2} \mathbb{E}_{t \sim Uniform [0,T]}[\lambda || \nabla_{x}logp_{t}(x)-s_{\theta}(x,t)||_{2}^{2}] + KL(p_{t} || \pi)
+	 \end{equation}
+	 $KL(p_{t} || \pi) \approx 0$ if T is large enough and this does not affect the optimization procedure, since it does not depend on model parameter $\theta$.
 \end{document}
