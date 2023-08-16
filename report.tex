@@ -4,6 +4,8 @@
 \date{August 2023}
 \usepackage[margin=1.5in]{geometry} % Adjust the values as per your requirements
 \usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{amsmath}
 \usepackage{graphicx}
 \graphicspath{ {./images/} }
 
@@ -156,4 +158,21 @@ For a finite number of noise scales, we can generate samples by reversing the pe
 	 KL(p_{0}(x) || p_{\theta} \leq \frac{1}{2} \mathbb{E}_{t \sim Uniform [0,T]}[\lambda || \nabla_{x}logp_{t}(x)-s_{\theta}(x,t)||_{2}^{2}] + KL(p_{t} || \pi)
 	 \end{equation}
 	 $KL(p_{t} || \pi) \approx 0$ if T is large enough and this does not affect the optimization procedure, since it does not depend on model parameter $\theta$.
+	 \subsection{Solving the reverse SDE}
+	 After having trained a time-depedent score model $s_{\theta}$, we can use it to construct the reverse-time SDE and generate samples. We can basically use any numerical stohastic differential equation solver: a simple approach is Euler-Maruyama, which is a stochastic generalization to the classical Euler solver fo ordinary differential equations. When applied to our estimated reverse SDE, it discretizes the SDE using finite time steps and small Gaussian noise: specifically, it chooses a small negative step $\Delta t \approx 0$, initializes $t \leftarrow T$, then iterates the following procedure until $t \approx 0$:
+	 \begin{equation} \begin{split}
+	 &\Delta x \leftarrow [f(x,t) - g^2(t)s_{\theta}(x,t)] \Delta t + g(t) \sqrt{|\Delta t|}z_{t} \\
+	 &x \leftarrow x+ \Delta x \\
+	 &t \leftarrow t+ \Delta t
+	 \end{split} \end{equation}
+	 where $z \sim \mathcal{N}(0, |\Delta t| I)$.
+	 Aside the Euler-Maruyama method, other numerical SDE solver can be used.\\
+	 \newline
+	 Since we have additional information that can be used, we can improve simple generic SDE solvers. Since we have a score-based model $s_{\theta}(x,t) \approx \nabla_{x} log\ p_{t}(x)$, and we only care about sampling for each marginal distribution $p_{t}(x)$, we can employ score-based MCMC (Markov Chain Monte Carlo) approaches such Langevin MCMC (Parisi, 1981) to fine-tune the trajectories obtained by the solver. Specifically we can use a predictor-corrector method. At each time step, the numerical SDE solver first gives an estimate of the sample at next time step (playing role of "predictor"). Then, the score based MCMC approach corrects the marginal distribution of estimated sample (playing the role of "corrector")
+	 \subsection{Probability flow and connection to neural ODEs}
+	 With this kind of continuous SDE approach, we do not only improve the empirical performace (sample generation), but also we can accurately compute the exact log-likelihood. This requires to convert the stochastic differential equation into an ordinary one without changing its marginal distributions $\{p_{t}(x)\}_{t \in [0,T]}$. Thus by solving this ODE, we can sample from the same distributions as the reverse SDE. The corresponding ODE of an SDE is named probability flow ODE, given by:
+	 \begin{equation}
+	 dx=[f(x,t) - \frac{1}{2} g^2(t \nabla_{x}log\ p_{t}(x))]dt
+	 \end{equation}
+Again this relys only on the score function and we can plug our conditional score model into the ODE in order to solve it. When we plug out conditional score model into the probability flow ODE, it becomes a special case of neural ODE. As such, the probability flow ODE inherits all properties of neural ODEs or continuous normalizing flows, including exact log-likelihood computation. Specifically, we can leverage the instantaneous change-of-variable formula o compute the unknown data density $p_{0}$ from the known prior density $p_{T}$ with numerical ODE solvers.
 \end{document}
