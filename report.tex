@@ -175,4 +175,26 @@ For a finite number of noise scales, we can generate samples by reversing the pe
 	 dx=[f(x,t) - \frac{1}{2} g^2(t \nabla_{x}log\ p_{t}(x))]dt
 	 \end{equation}
 Again this relys only on the score function and we can plug our conditional score model into the ODE in order to solve it. When we plug out conditional score model into the probability flow ODE, it becomes a special case of neural ODE. As such, the probability flow ODE inherits all properties of neural ODEs or continuous normalizing flows, including exact log-likelihood computation. Specifically, we can leverage the instantaneous change-of-variable formula o compute the unknown data density $p_{0}$ from the known prior density $p_{T}$ with numerical ODE solvers.
+	\newpage
+\section{Experiments}
+in this section we will describe the implementation in pytorch and the obtained results.
+\subsection{Time-dependent Score-Based Model}
+There are no special constraint in defining the architecture of a time-dependent score model, except that their output should have the same dimensionality as the input, and they should be conditioned on time. \\
+The architecture used in this case is the U-net architecture as the backbone for the score network $s_{\theta}(x,t)$ since it works very well and it provides the the same dimensionality as the input. Here the time information is incorporated via Gaussian random features. More specifically we first sample $\omega \sim \mathcal{N}(0,s^2I)$ which is subsequently fixed for the model (i.e. not learnable). For a time step $t$, the corresponding Gaussian random feature is defined as
+\begin{align}
+  [\sin(2\pi \omega t) ; \cos(2\pi \omega t)],
+\end{align}
+feature can be used as an encoding for time step $t$ so that the score network can condition on $t$ by incorporating this encoding.\\
+We then rescale the output of the U-net by $1/\sqrt{\mathbb{E}[\|\nabla_{\mathbf{x}}\log p_{0t}(\mathbf{x}(t) \mid \mathbf{x}(0)) \|_2^2]}$, the optimal $s_\theta(\mathbf{x}(t), t)$ has an $\ell_2$-norm close to $\mathbb{E}[\|\nabla_{\mathbf{x}}\log p_{0t}(\mathbf{x}(t) \mid \mathbf{x}(0))]\|_2$, due to which the rescaling helps capture the norm of the true score. It's worth recalling that the training objective consists of sums of the following form:
+\begin{align*}
+\mathbf{E}_{\mathbf{x}(t) \sim p_{0t}(\mathbf{x}(t) \mid \mathbf{x}(0))}[ \|s_\theta(\mathbf{x}(t), t) - \nabla_{\mathbf{x}(t)}\log p_{0t}(\mathbf{x}(t) \mid \mathbf{x}(0))\|_2^2].
+\end{align*}
+Hence, it's reasonable to anticipate that the optimal score model $s_\theta(\mathbf{x}, t) \approx \nabla_{\mathbf{x}(t)} \log p_{0t}(\mathbf{x}(t) \mid \mathbf{x}(0))$.\\ 
+Also we use exponential moving average (EMA) of weights when sampling, this improves sample quality at the expense of more training effort.
+	\subsection{Training with Weighted Sum of Denoising Score Matching Objectives}
+First of all we need to specify an SDE that perturbs the data distribution $p_0$ to $p_{t}$:
+	\begin{equation}
+		d \mathbf{x} = \sigma^t d\mathbf{w}, \quad t\in[0,1]
+	\end{equation}
+		
 \end{document}
