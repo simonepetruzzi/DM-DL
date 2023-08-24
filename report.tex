@@ -191,10 +191,85 @@ We then rescale the output of the U-net by $1/\sqrt{\mathbb{E}[\|\nabla_{\mathbf
 \end{align*}
 Hence, it's reasonable to anticipate that the optimal score model $s_\theta(\mathbf{x}, t) \approx \nabla_{\mathbf{x}(t)} \log p_{0t}(\mathbf{x}(t) \mid \mathbf{x}(0))$.\\ 
 Also we use exponential moving average (EMA) of weights when sampling, this improves sample quality at the expense of more training effort.
-	\subsection{Training with Weighted Sum of Denoising Score Matching Objectives}
+\subsection{Training}
+For training procedure we entirely leveraged on Google Colab.
+\subsubsection{Training with Weighted Sum of Denoising Score Matching Objectives}
 First of all we need to specify an SDE that perturbs the data distribution $p_0$ to $p_{t}$:
 	\begin{equation}
 		d \mathbf{x} = \sigma^t d\mathbf{w}, \quad t\in[0,1]
 	\end{equation}
+in which we can see $\sigma^t$ as continuous time generalization of the noise table $\sigma_{1},....,\sigma_t$ and where $d\mathbf{w}$ is the infinitesimal Gaussian noise. The training objective function, contains sums of the form:
+\begin{align*}
+\lambda(t)\  \mathbf{E}_{\mathbf{x}(t) \sim p_{0t}(\mathbf{x}(t) \mid \mathbf{x}(0))}[ \|s_\theta(\mathbf{x}(t), t) - \nabla_{\mathbf{x}(t)}\log p_{0t}(\mathbf{x}(t) \mid \mathbf{x}(0))\|_2^2].
+\end{align*}
+We can choose the weighting function $\lambda(t) = \frac{1}{2 \log \sigma}(\sigma^{2t} - 1)$. When $\sigma$ is large, the prior distribution, $p_{t=1}$ is
+\begin{align*}
+\int p_0(\mathbf{y})\mathcal{N}\bigg(\mathbf{x}; \mathbf{y}, \frac{1}{2 \log \sigma}(\sigma^2 - 1)\mathbf{I}\bigg) d \mathbf{y} \approx \mathbf{N}\bigg(\mathbf{x}; \mathbf{0}, \frac{1}{2 \log \sigma}(\sigma^2 - 1)\mathbf{I}\bigg),
+\end{align*}
+which is approximately independent of the data distribution and is easy to sample from.
+\subsubsection{epochs}
+\subsection{Sampling}
+For sampling we adopted three different methods
+\subsubsection{Numerical SDE solver}
+For any SDE of the form
+\begin{align*}
+d \mathbf{x} = \mathbf{f}(\mathbf{x}, t) dt + g(t) d\mathbf{w},
+\end{align*}
+the reverse-time SDE is given by
+\begin{align*}
+d \mathbf{x} = [\mathbf{f}(\mathbf{x}, t) - g(t)^2 \nabla_\mathbf{x} \log p_t(\mathbf{x})] dt + g(t) d \bar{\mathbf{w}},
+\end{align*}
+
+We have chosen the forward SDE to be
+\begin{align*}
+d \mathbf{x} = \sigma^t d\mathbf{w}, \quad t\in[0,1],
+\end{align*}
+and the reverse-time SDE is given by
+\begin{align*}
+d\mathbf{x} = -\sigma^{2t} \nabla_\mathbf{x} \log p_t(\mathbf{x}) dt + \sigma^t d \bar{\mathbf{w}},
+\end{align*}
+
+To sample from our time-dependent score-based model \(s_\theta(\mathbf{x}, t)\), we first draw a sample from the prior distribution \(p_1 \approx \mathbf{N}\bigg(\mathbf{x}; \mathbf{0}, \frac{1}{2}(\sigma^{2} - 1) \mathbf{I}\bigg)\), and then solve the reverse-time SDE with numerical methods.
+
+In particular, using our time-dependent score-based model, the reverse-time SDE can be approximated by
+\begin{align*}
+d\mathbf{x} = -\sigma^{2t} s_\theta(\mathbf{x}, t) dt + \sigma^t d \bar{\mathbf{w}}
+\end{align*}
+
+Numerical methods can be used to solve the reverse-time SDE, such as the [Euler-Maruyama] approach. It is based on a simple discretization to the SDE, replacing \(dt\) with \(\Delta t\) and \(d \mathbf{w}\) with \(\mathbf{z} \sim \mathcal{N}(\mathbf{0}, g^2(t) \Delta t \mathbf{I})\). When applied to our reverse-time SDE, we can obtain the following iteration rule
+\begin{align}
+\mathbf{x}_{t-\Delta t} = \mathbf{x}_t + \sigma^{2t} s_\theta(\mathbf{x}_t, t)\Delta t + \sigma^t\sqrt{\Delta t} \mathbf{z}_t,
+\end{align}
+where \(\mathbf{z}_t \sim \mathcal{N}(\mathbf{0}, \mathbf{I})\).
+\subsubsection{Predictor-Corrector method}
+We can make use of the specific properties of our reverse-time SDE to improve the solutions, apart from using general numerical SDE solvers. With an estimate of the score of $p_t(\mathbf{x}(t))$ from the score-based model, i.e., $s_\theta(\mathbf{x}, t) \approx \nabla_{\mathbf{x}(t)} \log p_t(\mathbf{x}(t))$, we can combine numerical SDE solvers with score-based MCMC techniques, like Langevin MCMC, to enhance the accuracy of the solutions.
+
+Score-based MCMC methods generate samples from a distribution $p(\mathbf{x})$ when its score $\nabla_\mathbf{x} \log p(\mathbf{x})$ is available. For instance, Langevin MCMC performs iterations according to the rule for $i=1,2,\cdots, N$:
+\begin{align*}
+\mathbf{x}_{i+1} = \mathbf{x}_{i} + \epsilon \nabla_\mathbf{x} \log p(\mathbf{x}_i) + \sqrt{2\epsilon} \mathbf{z}_i,
+\end{align*}
+where $\mathbf{z}_i \sim \mathcal{N}(\mathbf{0}, \mathbf{I})$, $\epsilon > 0$ is the step size, and $\mathbf{x}_1$ is initialized from any prior distribution $\pi(\mathbf{x}_1)$. As $N\to\infty$ and $\epsilon \to 0$, the final value $\mathbf{x}_{N+1}$ converges to a sample from $p(\mathbf{x})$ under certain conditions. Thus, when we have $s_\theta(\mathbf{x}, t) \approx \nabla_\mathbf{x} \log p_t(\mathbf{x})$, we can obtain an approximate sample from $p_t(\mathbf{x})$ by executing multiple steps of Langevin MCMC, using $s_\theta(\mathbf{x}, t)$ in place of $\nabla_\mathbf{x} \log p_t(\mathbf{x})$ in the iteration rule.
+
+Predictor-Corrector samplers combine numerical SDE solvers for the reverse-time SDE with the Langevin MCMC technique. Specifically, we initiate with a single step of the numerical SDE solver, generating $\mathbf{x}_{t-\Delta t}$ from $\mathbf{x}_t$, known as the "predictor" step. Following this, we apply several steps of Langevin MCMC to refine $\mathbf{x}_t$, making $\mathbf{x}_t$ a more accurate sample from $p_{t-\Delta t}(\mathbf{x})$. This procedure is termed the "corrector" step, as MCMC aids in reducing the error introduced by the numerical SDE solver.
+\subsubsection{Numerical ODE solver}
+The associated ordinary differential equation (ODE) for any SDE of the form
+\begin{align*}
+d \mathbf{x} = \mathbf{f}(\mathbf{x}, t) d t + g(t) d \mathbf{w},
+\end{align*}
+is given by
+\begin{align*}
+d \mathbf{x} = \bigg[\mathbf{f}(\mathbf{x}, t) - \frac{1}{2}g(t)^2 \nabla_\mathbf{x} \log p_t(\mathbf{x})\bigg] dt,
+\end{align*}
+where both trajectories share the same marginal probability density $p_t(\mathbf{x})$. Consequently, by solving this ODE in reverse time, we can effectively sample from the distribution that solving the reverse-time SDE yields.
+We refer to this ODE as the *probability flow ODE*.
+
+Here's a schematic figure illustrating the distinction between trajectories produced by the probability flow ODE and SDE trajectories. Despite the differences, both methods sample from the same distribution. Thus, starting from a sample from $p_T$, we can integrate the ODE in reverse time to acquire a sample from $p_0$. Specifically, for the SDE in our ongoing example, the following ODE can be integrated from $t=T$ to $0$ to generate samples
+\begin{align*}
+d\mathbf{x} =  -\frac{1}{2}\sigma^{2t} s_\theta(\mathbf{x}, t) dt.
+\end{align*}
+This integration can be performed using various black-box ODE solvers available in packages like `scipy`.
+	
+
+
 		
 \end{document}
