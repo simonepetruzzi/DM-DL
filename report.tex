@@ -1,5 +1,5 @@
 \documentclass{article}
-\title{Diffusion and Score-based Generative Models}
+\title{Diffusion and Score-based Generative Modeling}
 \author{Simone Petruzzi-1811872 Domenico Tersigni-}
 \date{August 2023}
 \usepackage[margin=1.5in]{geometry} % Adjust the values as per your requirements
@@ -124,10 +124,11 @@
      \newpage
      \section{Score-based generative modeling with stochastic differential equations}
      As already discussed, adding multiple noise scale is critical for the success of score-based generative models. In this section the aim is to generalize the previous framework (that is using a finite number of noise levels), to use an infinite number of noise levels. By generalizing the number of noise scales to infinity, we obtain not only high quality samples, but also, among others, exact log-likelihood computation, and controllable generation. Specifically we consider a continuum of distribution that evolve over time according to a diffusion process that progressively diffuses a data point itno random noise, and is given by a SDE (Stochastic Differential Equation) that does not depend on the data and has no trainable parameters. After the training procedure, by reversing the previous process, we can mold random noise into data for sample generation. This reverse process relys on a reverse-time SDE, which can be derived from the forward SDE given the score of the marginal probbility densities as function of time. Therefore we can approximate the reverse-time SDE with a time-dependent neural network which estimates the scores, and then produce samples by simply using numerical SDE solvers.\\
-      \begin{figure}[h]
-	  	\includegraphics[width=11cm]{SDEmodel}
-	  	\centering
-	  \end{figure}
+      \begin{figure}[htbp]
+    	\centering
+    	\includegraphics[width=0.8\textwidth]{SDEmodel} 
+    	\caption{SDE model}
+\end{figure}
 	\subsection{Perturbing data with SDEs}
 When the number of noise scales approaches infinity, we essentially perturb the data distribution with continuously growing levels of noise. The perturbation procedure is a continuous time stochastic process. Our goal is to construct a diffusion process that is solution of a stochastic differential equation. This diffusion process $\{ x(t) \}_{t=0}^{T}$ can be modeled as the solution of the following SDE:
 	\begin{equation}
@@ -207,7 +208,14 @@ We can choose the weighting function $\lambda(t) = \frac{1}{2 \log \sigma}(\sigm
 \int p_0(\mathbf{y})\mathcal{N}\bigg(\mathbf{x}; \mathbf{y}, \frac{1}{2 \log \sigma}(\sigma^2 - 1)\mathbf{I}\bigg) d \mathbf{y} \approx \mathbf{N}\bigg(\mathbf{x}; \mathbf{0}, \frac{1}{2 \log \sigma}(\sigma^2 - 1)\mathbf{I}\bigg),
 \end{align*}
 which is approximately independent of the data distribution and is easy to sample from.
-\subsubsection{epochs}
+\subsubsection{Epochs}
+We made several experiments on the number of epochs needed to reach a good score-based model. Number of epochs we trained our model varies from 50 to 200. After 50 epochs our score-based model already works well obtaining a solid base for sampling. However we can improve training for 200 epochs. After 200 epochs the improvement of the loss is almost null (as we can see in the image below), thus we decided to stop after 200 epochs.
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.8\textwidth]{loss} 
+    \caption{Train loss}
+\end{figure}
+
 \subsection{Sampling}
 For sampling we adopted three different methods
 \subsubsection{Numerical SDE solver}
@@ -268,8 +276,35 @@ Here's a schematic figure illustrating the distinction between trajectories prod
 d\mathbf{x} =  -\frac{1}{2}\sigma^{2t} s_\theta(\mathbf{x}, t) dt.
 \end{align*}
 This integration can be performed using various black-box ODE solvers available in packages like `scipy`.
-	
+\subsection{Results}
+The training procedure has been carried out by using the MNIST dataset only. Unfortunately for training on datasets with more detailed images was required a lot of computational effort we could not afford with Google Colab. On the MNIST dataset instead, we reached good results in the generation process. The loss score was not amazing (around 15 $ \% $), however we could generate with different samplers (described above) good quality images. We report some of the results differentiating on samplers that have been used. \\
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.4\textwidth]{EM} 
+    \caption{Euler-Maruyama sampler}
+\end{figure} \\
+\newline
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.4\textwidth]{PC} 
+    \caption{Predictor-Corrector sampler}
+\end{figure} \\
+\newline
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.4\textwidth]{ODE} 
+    \caption{ODE sampler}
+\end{figure}\\
+\newline
+As we can clearly see from the figures, we plotted a grid (8x8) of images, containing brand new samples. We also tried to train our model on specific classes of the MNIST dataset obtaining less loss accuracy (around 20 $\%$), due to a fewer presence of training images. We present an example of sampling given by the training on the 5 class.\\
+\newline
+\begin{figure}[htbp]
+    \centering
+    \includegraphics[width=0.4\textwidth]{5ODE} 
+    \caption{ODE sampler}
+\end{figure}\\
+\newline
+\subsection{Coclusion}
+As we can see from the previous images, we reached good results in the generation process. However the reader must consider that our model is a toy one, in the sense that it can be improved a lot. The authors of the papers from which we built the theory, have built a neural network and a predictor-corrector sampler that achieve state-of-the-art sample quality on CIFAR-10 (measured in FID and Inception scores), outperforming the best GAN model to date (StyleGAN2 + ADA). They used a better architecture with respect to our model and also they could train it on better machines.
 
-
-		
 \end{document}
